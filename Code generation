@@ -1,0 +1,67 @@
+!pip install transformers
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+def generate_code_with_huggingface(prompt, model_name="Salesforce/codegen-2B-mono", max_length=300):
+    """
+    Function to generate Python code using a Hugging Face model.
+    Args:
+        prompt (str): Input prompt describing the task/code to generate.
+        model_name (str): Name of the Hugging Face model to use.
+        max_length (int): Maximum length of the generated output.
+    Returns:
+        str: Generated Python code.
+    """
+    try:
+        # Load the tokenizer and model from Hugging Face
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+
+        # Tokenize the input prompt
+        inputs = tokenizer(prompt, return_tensors="pt")
+
+        # Generate code using the model
+        outputs = model.generate(
+            **inputs,
+            max_length=max_length,
+            num_return_sequences=1,
+            temperature=0.7,
+            top_k=50,
+            top_p=0.9,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+        # Decode and clean the generated code
+        generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        cleaned_code = clean_generated_code(generated_code, prompt)
+        return cleaned_code
+    except Exception as e:
+        return f"Error: {e}"
+
+def clean_generated_code(generated_code, prompt):
+    """
+    Cleans the generated code by removing the prompt and extra text.
+    Args:
+        generated_code (str): Raw generated code from the model.
+        prompt (str): Original input prompt.
+    Returns:
+        str: Cleaned Python code.
+    """
+    # Remove the prompt from the output
+    if prompt in generated_code:
+        generated_code = generated_code.replace(prompt, "").strip()
+
+    # Extract the Python function if multiple lines are generated
+    lines = generated_code.split("\n")
+    code_lines = []
+    for line in lines:
+        if line.startswith("#") or line.startswith("import") or line.strip().startswith("def"):
+            code_lines.append(line)
+        elif len(code_lines) > 0:  # Stop when unrelated text starts
+            code_lines.append(line)
+    return "\n".join(code_lines).strip()
+
+# Example Usage
+prompt = "Write a Python function to calculate the Fibonacci series up to n."
+generated_code = generate_code_with_huggingface(prompt)
+print(generated_code)
